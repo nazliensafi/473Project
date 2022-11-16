@@ -1,85 +1,64 @@
-# imports
-import numpy as np  # linear algebra
-import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
+import numpy as np
 import os
-from keras.models import Sequential
-from keras.layers import Dense
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from keras.layers import Dropout
 from sklearn.metrics import confusion_matrix
-
-data_filepath = os.path.join(os.getcwd(), "..", "data.csv")
-df = pd.read_csv(data_filepath)
-
-df.drop(["Unnamed: 32", "id"], axis=1, inplace=True)
+from NeuralNetwork import NeuralNetwork
 
 
-def categorical_to_numeric_diagnosis(x):
-    if x == "M":
+def numerical_diagnosis(diagnosis):
+    if diagnosis == "M":
         return 1
-    if x == "B":
+    if diagnosis == "B":
         return 0
 
 
-df["diagnosis"] = df["diagnosis"].apply(categorical_to_numeric_diagnosis)
+if __name__ == "__main__":
+    data_filepath = os.path.join(os.getcwd(), "..", "data.csv")
+    df = pd.read_csv(data_filepath)
 
-features = list(df.columns[1:31])
+    df.drop(["Unnamed: 32", "id"], axis=1, inplace=True)
 
-X_train, X_test, y_train, y_test = train_test_split(
-    df[features], df["diagnosis"].values, test_size=0.30, random_state=42
-)
+    # Transform diagnosis column to 1s and 0s
+    df["diagnosis"] = df["diagnosis"].apply(numerical_diagnosis)
 
-# Initialising the ANN
-classifier = Sequential()
+    features = list(df.columns[1:11])
 
-# Adding the input layer and the first hidden layer
-classifier.add(
-    Dense(units=32, kernel_initializer="uniform", activation="relu", input_dim=30)
-)
-classifier.add(Dropout(rate=0.1))
+    X_train, X_test, y_train, y_test = train_test_split(
+        df[features], df["diagnosis"].values, test_size=0.3
+    )
 
-# Adding the second hidden layer
-classifier.add(Dense(units=16, kernel_initializer="uniform", activation="relu"))
-classifier.add(Dropout(rate=0.1))
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train.values)
+    X_test = scaler.fit_transform(X_test.values)
 
-# Adding the third hidden layer
-classifier.add(Dense(units=8, kernel_initializer="uniform", activation="relu"))
-classifier.add(Dropout(rate=0.1))
+    # Define layer sizes
+    input_nodes = X_train.shape[1]
+    hidden_nodes = 32
+    output_nodes = 2
 
-# Adding the output layer
-classifier.add(Dense(units=1, kernel_initializer="uniform", activation="sigmoid"))
+    # Create neural network
+    nn = NeuralNetwork([input_nodes, hidden_nodes, output_nodes])
 
-# Compiling the ANN
-classifier.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+    nn.train(
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        batch_size=10,
+        epochs=100,
+        l_rate=0.2,
+    )
 
-classifier.summary()
+    # Get model performance
+    y_prediction = nn.predict(X_test)
+    y_prediction = np.reshape(y_prediction, (len(y_prediction), 1))
 
-scaler = StandardScaler()
+    cm = confusion_matrix(y_test, y_prediction)
+    tn, fn, fp, tp = confusion_matrix(y_prediction, y_test).ravel()
 
-classifier.fit(
-    scaler.fit_transform(X_train.values),
-    np.array(y_train),
-    batch_size=5,
-    epochs=100,
-)
+    accuracy = (cm[0][0] + cm[1][1]) / (cm[0][0] + cm[0][1] + cm[1][0] + cm[1][1])
+    print(f"\nAccuracy: {str((accuracy * 100).round(4))}%")
 
-classifier.save("breast_cancer_model.h5")  # Save trained ANN
-
-y_prediction = classifier.predict(scaler.transform(X_test.values))
-
-for sample_pred in y_prediction:
-    diff = 1 - sample_pred[0]
-    if sample_pred[0] > diff:
-        sample_pred[0] = 1
-    else:
-        sample_pred[0] = 0
-
-
-cm = confusion_matrix(y_test, y_prediction)
-tn, fn, fp, tp = confusion_matrix(y_prediction, y_test).ravel()
-
-print(cm)
-
-accuracy = (cm[0][0] + cm[1][1]) / (cm[0][0] + cm[0][1] + cm[1][0] + cm[1][1])
-print("Accuracy: " + str(accuracy * 100) + "%")
+    nn.show_accuracies()
