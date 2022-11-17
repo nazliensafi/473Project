@@ -1,5 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from data import X_train, y_train, X_test, y_test
+from metrics import *
+import numpy as np
+from sklearn.preprocessing import StandardScaler
 
 
 class NeuralNetwork:
@@ -80,7 +84,9 @@ class NeuralNetwork:
 
     def predict(self, X):
         _, a2 = self.forward_prop(X)
-        return np.argmax(a2, axis=1)
+        prediction = np.argmax(a2, axis=1)
+        prediction = np.reshape(prediction, (len(prediction), 1))
+        return prediction
 
     def train(self, X_train, y_train, X_test, y_test, batch_size, epochs, l_rate):
         # Separate the date in batches
@@ -95,22 +101,20 @@ class NeuralNetwork:
             for X_batch, y_batch in batches:
                 a1, a2 = self.forward_prop(X_batch)
 
-                # Get loss
+                # Get train loss
                 loss = self.cross_entropy(a2, y_batch)
                 loss_batch.append(loss)
 
                 # Backpropagate
                 dw1, db1, dw2, db2 = self.backward_prop(a1, a2, X_batch, y_batch)
 
-                # Optimize
+                # Optimize params
                 self.optimize(l_rate, dw1, db1, dw2, db2)
-
-            # return
 
             for X_batch_test, y_batch_test in test_batches:
                 _, a2_test = self.forward_prop(X_batch_test)
 
-                # # Get loss
+                # Get test loss
                 test_loss = self.cross_entropy(a2_test, y_batch_test)
                 test_loss_batch.append(test_loss)
 
@@ -120,15 +124,17 @@ class NeuralNetwork:
 
             # Measure performance of model
             # Measure accuracies
-            train_acc = self.get_accuracy(X_train, y_train, batch_size)
-            test_acc = self.get_accuracy(X_test, y_test, batch_size)
+            train_pred = self.predict(X_train)
+            test_pred = self.predict(X_test)
+            train_acc = round(accuracy(y_train, train_pred), 5) * 100
+            test_acc = round(accuracy(y_test, test_pred), 5) * 100
 
             # Add accuracies to log of accuracies
             self.train_log.append(train_acc)
             self.test_log.append(test_acc)
 
             print(
-                f"Epoch {i+1}/{epochs} => Train Accuracy: {train_acc} - Train Loss: {mean_train_loss} - Test Accuracy: {test_acc} - Test Loss: {mean_test_loss}"
+                f"Epoch {i+1}/{epochs} => Train Accuracy: {train_acc}% - Train Loss: {mean_train_loss} - Test Accuracy: {test_acc}% - Test Loss: {mean_test_loss}"
             )
 
     def get_batches(self, X, y, batch_size):
@@ -148,26 +154,44 @@ class NeuralNetwork:
 
         return batches
 
-    def get_accuracy(self, X, y, batch_size):
-        n = X.shape[0]
-        y_pred = np.array([], dtype="int64")
-        y_real = np.array([], dtype="int64")
-
-        for i in range(0, n, batch_size):
-            X_batch = X[i : i + batch_size, :]
-            y_batch = y[
-                i : i + batch_size,
-            ]
-
-            y_real = np.append(y_real, y_batch)
-            y_pred = np.append(y_pred, self.predict(X_batch))
-
-        accuracy = np.mean(y_real == y_pred)
-        return accuracy.round(4)
-
     def show_accuracies(self):
         plt.plot(self.train_log, label="train accuracy")
         plt.plot(self.test_log, label="test accuracy")
         plt.legend(loc="best")
         plt.grid()
         plt.show()
+
+
+if __name__ == "__main__":
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train.values)
+    X_test = scaler.fit_transform(X_test.values)
+
+    # Define layer sizes
+    input_nodes = X_train.shape[1]
+    hidden_nodes = 32
+    output_nodes = 2
+
+    # Create neural network
+    nn = NeuralNetwork([input_nodes, hidden_nodes, output_nodes])
+
+    nn.train(
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        batch_size=10,
+        epochs=100,
+        l_rate=0.2,
+    )
+
+    # Get model performance
+    pred = nn.predict(X_test)
+
+    print()
+    print("Neural network accuracy :  ", accuracy(y_test, pred))
+    print("Neural network precision :  ", precision(y_test, pred))
+    print("Neural network recall :  ", recall(y_test, pred))
+    print("Neural network F1 :  ", f1(y_test, pred))
+
+    # nn.show_accuracies()
