@@ -1,12 +1,9 @@
-
-# imports
-import numpy as np  # linear algebra
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 import os
 from sklearn.model_selection import train_test_split
 
 
-data_filepath = os.path.join(os.getcwd(), "..", "data.csv")
+data_filepath = os.path.join(os.getcwd(), "data.csv")
 df = pd.read_csv(data_filepath)
 
 df.drop(["Unnamed: 32", "id"], axis=1, inplace=True)
