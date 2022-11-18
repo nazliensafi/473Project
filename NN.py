@@ -77,11 +77,6 @@ class NeuralNetwork:
         grad = grad / m
         return grad
 
-    def softmax(self, x):
-        exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
-        out = exp_x / np.sum(exp_x, axis=1, keepdims=True)
-        return out
-
     def predict(self, X):
         _, a2 = self.forward_prop(X)
         prediction = np.argmax(a2, axis=1)
