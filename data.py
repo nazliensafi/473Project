@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 data_filepath = os.path.join(os.getcwd(), "data.csv")
 df = pd.read_csv(data_filepath)
 
-df.drop(["Unnamed: 32", "id"], axis=1, inplace=True)
+df.drop(["id"], axis=1, inplace=True)
 
 
 def categorical_to_numeric_diagnosis(x):
