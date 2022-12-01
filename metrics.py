@@ -106,3 +106,9 @@ def f1(gold_standard, prediction):
     r = recall(gold_standard, prediction)
     f1s = 2 * p * r / (p + r)
     return f1s
+
+def fn_rate(gold_standard, prediction):
+    """
+    False negative rate
+    """
+    return false_negative(gold_standard, prediction) / (false_negative(gold_standard, prediction) + true_positive(gold_standard, prediction))

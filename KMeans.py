@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import numpy as np
 import pandas
 import pandas as pd
@@ -7,13 +9,13 @@ import metrics
 
 
 class KMeans:
-    def __init__(self, k):
-        self.k = k
+    def __init__(self):
         self.history = []
-        self.centroid_history = []
-        pass
+        self.centroid_history = defaultdict(list)
+        self.run_number = 0
+        self.best_centroids = None
 
-    def _assign_cluster_to_samples(self, data, centroids_df, distance_fx):
+    def _assign_cluster_to_samples(self, data, centroids_df, distance_fx, train=False):
         """
         Iterates over every sample and finds closest cluster based on distance function.
         Returns DataFrame with 'cluster id' and 'centroid distance'.
@@ -22,7 +24,9 @@ class KMeans:
         :param distance_fx:
         :return:
         """
-        self.centroid_history.append(centroids_df)
+        if train:
+            self.centroid_history[f'run_{self.run_number}'].append(centroids_df)
+
         clusters_df = pandas.DataFrame()
         for sample_index, sample in data.iterrows():
             centroid_distances = []
@@ -34,7 +38,7 @@ class KMeans:
             min_centroid_distance = min(centroid_distances)
             min_distance_centroid_index = centroid_distances.index(min_centroid_distance)
 
-            centroid_s = pd.Series(name=sample_index)
+            centroid_s = pd.Series(name=sample_index, dtype=np.float64)
 
             centroid_s['cluster id'] = min_distance_centroid_index
             centroid_s['centroid distance'] = min_centroid_distance
@@ -60,7 +64,7 @@ class KMeans:
         next_centroids = data.groupby(['cluster id']).mean()
         return next_centroids
 
-    def runner(self):
+    def fit(self, X_train: pd.DataFrame, y_train: pd.DataFrame, n_runs=1, k=2, verbose=False):
         """
         Initializes centroids to random samples. Assigns a cluster to every sample, based on distance to centroid.
         Calculates new centroid for every cluster, based on samples belonging to that cluster.
@@ -69,28 +73,52 @@ class KMeans:
         Else, recalculate cluster centroids, and repeat.
         :return:
         """
-        current_centroids_df = DATA.X_train.sample(self.k)
-        current_clusters_df = self._assign_cluster_to_samples(DATA.X_train, current_centroids_df, self._distance)
-        while True:
-            next_centroids_df = self._next_centroids(current_clusters_df)
-            next_clusters_df = self._assign_cluster_to_samples(DATA.X_train, current_centroids_df, self._distance)
+        best_clusters = None
+        best_centroids = None
+        best_score = None
 
-            current_clusters_df = next_clusters_df
-            current_centroids_df = next_centroids_df
+        for i in range(n_runs):
+            self.run_number = i + 1
 
-            if next_clusters_df.equals(current_clusters_df):
-                break
+            current_centroids_df = X_train.sample(k)
+            current_clusters_df = self._assign_cluster_to_samples(X_train, current_centroids_df, self._distance, train=True)
+            if verbose:
+                print(f'RUN {i+1}')
+                print('initial centroids')
+                print(current_centroids_df)
 
-        return current_clusters_df, current_centroids_df
+            while True:
+                next_centroids_df = self._next_centroids(current_clusters_df)
+                next_clusters_df = self._assign_cluster_to_samples(DATA.X_train, current_centroids_df, self._distance, train=True)
 
+                current_clusters_df = next_clusters_df
+                current_centroids_df = next_centroids_df
 
-solver = KMeans(k=2)
+                if next_clusters_df.equals(current_clusters_df):
+                    break
 
-r1 = DATA.X_train.iloc[0]
-r2 = DATA.X_train.iloc[1]
+            cluster_ids = current_clusters_df['cluster id']
+            inverted_cluster_ids = current_clusters_df['cluster id'].replace({0: 1, 1: 0})
 
-a, b = solver.runner()
+            f1score = metrics.f1(y_train, cluster_ids)
+            f1score_inverted = metrics.f1(y_train, inverted_cluster_ids)
+            current_clusters_df['cluster id'] = cluster_ids if f1score >= f1score_inverted else inverted_cluster_ids
+            f1score = f1score if f1score >= f1score_inverted else f1score_inverted
 
-f1score = metrics.f1(DATA.y_train, a['cluster id'])
-print(f1score)
-print('break')
+            if verbose:
+                print('Final centroids')
+                print(current_centroids_df)
+                print(f'f1score: {f1score}\n\n')
+
+            if best_score is None or f1score > best_score:
+                best_clusters = current_clusters_df
+                best_centroids = current_centroids_df
+                best_score = f1score
+
+        self.best_centroids = best_centroids
+
+        return best_clusters, best_centroids, best_score
+
+    def predict(self, X):
+        clusters_df = self._assign_cluster_to_samples(X, self.best_centroids, self._distance)
+        return clusters_df['cluster id']
