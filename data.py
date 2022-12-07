@@ -3,7 +3,7 @@ import os
 from sklearn.model_selection import train_test_split
 
 
-data_filepath = os.path.join(os.getcwd(), "data.csv")
+data_filepath = os.path.join(os.getcwd(), "data", "biopsy data.csv")
 df = pd.read_csv(data_filepath)
 
 df.drop(["id"], axis=1, inplace=True)
