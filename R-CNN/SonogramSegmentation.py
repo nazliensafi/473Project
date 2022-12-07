@@ -6,11 +6,20 @@ import cv2
 import tensorflow as tf
 import math
 import shutil
+from keras.layers import (
+    Dropout,
+    Conv2D,
+    MaxPooling2D,
+    BatchNormalization,
+    Activation,
+    Conv2DTranspose,
+)
 
 DATA_PATH = os.path.join(os.path.dirname(os.getcwd()), "data")
 DATASET_PATH = os.path.join(DATA_PATH, "Dataset_BUSI_with_GT")
 TRAINIG_PATH = DATASET_PATH + "_Train"
 TESTING_PATH = DATASET_PATH + "_Test"
+SAMPLE_TYPES = ["normal", "benign", "malignant"]
 
 
 def split_sonogram_data():
@@ -92,20 +101,11 @@ def get_sonogram_data(shape):
     images_test = []
     masks_test = []
 
-    normal_train_folder = os.path.join(TRAINIG_PATH, "normal")
-    normal_test_folder = os.path.join(TESTING_PATH, "normal")
-    get_folder_data(normal_train_folder, images_train, masks_train, shape)
-    get_folder_data(normal_test_folder, images_test, masks_test, shape)
-
-    benign_train_folder = os.path.join(TRAINIG_PATH, "benign")
-    benign_test_folder = os.path.join(TESTING_PATH, "benign")
-    get_folder_data(benign_train_folder, images_train, masks_train, shape)
-    get_folder_data(benign_test_folder, images_test, masks_test, shape)
-
-    malignant_train_folder = os.path.join(TRAINIG_PATH, "malignant")
-    malignant_test_folder = os.path.join(TESTING_PATH, "malignant")
-    get_folder_data(malignant_train_folder, images_train, masks_train, shape)
-    get_folder_data(malignant_test_folder, images_test, masks_test, shape)
+    for sample_type in SAMPLE_TYPES:
+        train_folder = os.path.join(TRAINIG_PATH, sample_type)
+        test_folder = os.path.join(TESTING_PATH, sample_type)
+        get_folder_data(train_folder, images_train, masks_train, shape)
+        get_folder_data(test_folder, images_test, masks_test, shape)
 
     return (
         np.array(images_train),
@@ -147,7 +147,7 @@ def convolutional_block(input_tensor, num_filters, kernel_size=3, use_batch_norm
     Returns:
     - a tensor, the output of the convolutional block.
     """
-    tensor = tf.keras.layers.Conv2D(
+    tensor = Conv2D(
         filters=num_filters,
         kernel_size=(kernel_size, kernel_size),
         kernel_initializer="he_normal",
@@ -155,11 +155,11 @@ def convolutional_block(input_tensor, num_filters, kernel_size=3, use_batch_norm
     )(input_tensor)
 
     if use_batch_norm:
-        tensor = tf.keras.layers.BatchNormalization()(tensor)
+        tensor = BatchNormalization()(tensor)
 
-    tensor = tf.keras.layers.Activation("relu")(tensor)
+    tensor = Activation("relu")(tensor)
 
-    tensor = tf.keras.layers.Conv2D(
+    tensor = Conv2D(
         filters=num_filters,
         kernel_size=(kernel_size, kernel_size),
         kernel_initializer="he_normal",
@@ -167,9 +167,9 @@ def convolutional_block(input_tensor, num_filters, kernel_size=3, use_batch_norm
     )(tensor)
 
     if use_batch_norm:
-        tensor = tf.keras.layers.BatchNormalization()(tensor)
+        tensor = BatchNormalization()(tensor)
 
-    tensor = tf.keras.layers.Activation("relu")(tensor)
+    tensor = Activation("relu")(tensor)
 
     return tensor
 
@@ -196,69 +196,69 @@ def create_unet_model(
     conv_block1 = convolutional_block(
         input_image, num_filters * 1, kernel_size=3, use_batch_norm=use_batch_norm
     )
-    pool1 = tf.keras.layers.MaxPooling2D((2, 2))(conv_block1)
-    pool1 = tf.keras.layers.Dropout(dropout_rate)(pool1)
+    pool1 = MaxPooling2D((2, 2))(conv_block1)
+    pool1 = Dropout(dropout_rate)(pool1)
 
     conv_block2 = convolutional_block(
         pool1, num_filters * 2, kernel_size=3, use_batch_norm=use_batch_norm
     )
-    pool2 = tf.keras.layers.MaxPooling2D((2, 2))(conv_block2)
-    pool2 = tf.keras.layers.Dropout(dropout_rate)(pool2)
+    pool2 = MaxPooling2D((2, 2))(conv_block2)
+    pool2 = Dropout(dropout_rate)(pool2)
 
     conv_block3 = convolutional_block(
         pool2, num_filters * 4, kernel_size=3, use_batch_norm=use_batch_norm
     )
-    pool3 = tf.keras.layers.MaxPooling2D((2, 2))(conv_block3)
-    pool3 = tf.keras.layers.Dropout(dropout_rate)(pool3)
+    pool3 = MaxPooling2D((2, 2))(conv_block3)
+    pool3 = Dropout(dropout_rate)(pool3)
 
     conv_block4 = convolutional_block(
         pool3, num_filters * 8, kernel_size=3, use_batch_norm=use_batch_norm
     )
-    pool4 = tf.keras.layers.MaxPooling2D((2, 2))(conv_block4)
-    pool4 = tf.keras.layers.Dropout(dropout_rate)(pool4)
+    pool4 = MaxPooling2D((2, 2))(conv_block4)
+    pool4 = Dropout(dropout_rate)(pool4)
 
     conv_block5 = convolutional_block(
         pool4, num_filters * 16, kernel_size=3, use_batch_norm=use_batch_norm
     )
 
     # Apply up-sampling and concatenation to the output of the convolutional blocks
-    up6 = tf.keras.layers.Conv2DTranspose(
-        num_filters * 8, (3, 3), strides=(2, 2), padding="same"
-    )(conv_block5)
+    up6 = Conv2DTranspose(num_filters * 8, (3, 3), strides=(2, 2), padding="same")(
+        conv_block5
+    )
     up6 = tf.keras.layers.concatenate([up6, conv_block4])
-    up6 = tf.keras.layers.Dropout(dropout_rate)(up6)
+    up6 = Dropout(dropout_rate)(up6)
     conv_block6 = convolutional_block(
         up6, num_filters * 8, kernel_size=3, use_batch_norm=use_batch_norm
     )
 
-    up7 = tf.keras.layers.Conv2DTranspose(
-        num_filters * 4, (3, 3), strides=(2, 2), padding="same"
-    )(conv_block6)
+    up7 = Conv2DTranspose(num_filters * 4, (3, 3), strides=(2, 2), padding="same")(
+        conv_block6
+    )
     up7 = tf.keras.layers.concatenate([up7, conv_block3])
-    up7 = tf.keras.layers.Dropout(dropout_rate)(up7)
+    up7 = Dropout(dropout_rate)(up7)
     conv_block7 = convolutional_block(
         up7, num_filters * 4, kernel_size=3, use_batch_norm=use_batch_norm
     )
 
-    up8 = tf.keras.layers.Conv2DTranspose(
-        num_filters * 2, (3, 3), strides=(2, 2), padding="same"
-    )(conv_block7)
+    up8 = Conv2DTranspose(num_filters * 2, (3, 3), strides=(2, 2), padding="same")(
+        conv_block7
+    )
     up8 = tf.keras.layers.concatenate([up8, conv_block2])
-    up8 = tf.keras.layers.Dropout(dropout_rate)(up8)
+    up8 = Dropout(dropout_rate)(up8)
     conv_block8 = convolutional_block(
         up8, num_filters * 2, kernel_size=3, use_batch_norm=use_batch_norm
     )
 
-    up9 = tf.keras.layers.Conv2DTranspose(
-        num_filters * 1, (3, 3), strides=(2, 2), padding="same"
-    )(conv_block8)
+    up9 = Conv2DTranspose(num_filters * 1, (3, 3), strides=(2, 2), padding="same")(
+        conv_block8
+    )
     up9 = tf.keras.layers.concatenate([up9, conv_block1])
-    up9 = tf.keras.layers.Dropout(dropout_rate)(up9)
+    up9 = Dropout(dropout_rate)(up9)
     conv_block9 = convolutional_block(
         up9, num_filters * 1, kernel_size=3, use_batch_norm=use_batch_norm
     )
 
-    output = tf.keras.layers.Conv2D(1, (1, 1), activation="sigmoid")(conv_block9)
+    output = Conv2D(1, (1, 1), activation="sigmoid")(conv_block9)
     unet = tf.keras.Model(inputs=[input_image], outputs=[output])
 
     return unet
@@ -332,12 +332,9 @@ if __name__ == "__main__":
     # Load the saved detection segmentation model
     unet_model = tf.keras.models.load_model("SonogramSegmentationModel.h5")
 
-    # Save training data
-    save_predictions(TRAINIG_PATH, "normal", unet_model, shape=256)
-    save_predictions(TRAINIG_PATH, "benign", unet_model, shape=256)
-    save_predictions(TRAINIG_PATH, "malignant", unet_model, shape=256)
+    for sample_type in SAMPLE_TYPES:
+        # Save training data
+        save_predictions(TRAINIG_PATH, sample_type, unet_model, shape=256)
 
-    # Save testing data
-    save_predictions(TESTING_PATH, "normal", unet_model, shape=256)
-    save_predictions(TESTING_PATH, "benign", unet_model, shape=256)
-    save_predictions(TESTING_PATH, "malignant", unet_model, shape=256)
+        # Save testing data
+        save_predictions(TESTING_PATH, sample_type, unet_model, shape=256)
