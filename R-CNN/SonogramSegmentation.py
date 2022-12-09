@@ -14,11 +14,8 @@ from keras.layers import (
     Activation,
     Conv2DTranspose,
 )
+import constants
 
-DATA_PATH = os.path.join(os.path.dirname(os.getcwd()), "data")
-DATASET_PATH = os.path.join(DATA_PATH, "Dataset_BUSI_with_GT")
-TRAINIG_PATH = DATASET_PATH + "_Train"
-TESTING_PATH = DATASET_PATH + "_Test"
 SAMPLE_TYPES = ["normal", "benign", "malignant"]
 
 
@@ -27,9 +24,9 @@ def split_sonogram_data():
     This function takes the original ultrasound image dataset and splits it into training and testing data.
     The two subsets are then saved in their appropriate folders
     """
-    normal_folder = os.path.join(DATASET_PATH, "normal")
-    benign_folder = os.path.join(DATASET_PATH, "benign")
-    malignant_folder = os.path.join(DATASET_PATH, "malignant")
+    normal_folder = os.path.join(constants.DATASET_PATH, "normal")
+    benign_folder = os.path.join(constants.DATASET_PATH, "benign")
+    malignant_folder = os.path.join(constants.DATASET_PATH, "malignant")
 
     split_folder("normal", normal_folder)
     split_folder("benign", benign_folder)
@@ -61,8 +58,8 @@ def split_folder(sample_type, folder):
     num_training = math.floor(len(sample_numbers) * 0.8)
 
     # Create directories for saving the images
-    training_folder = os.path.join(TRAINIG_PATH, sample_type)
-    test_folder = os.path.join(TESTING_PATH, sample_type)
+    training_folder = os.path.join(constants.TRAINIG_PATH, sample_type)
+    test_folder = os.path.join(constants.TESTING_PATH, sample_type)
 
     if not os.path.exists(training_folder):
         os.makedirs(training_folder)
@@ -102,8 +99,8 @@ def get_sonogram_data(shape):
     masks_test = []
 
     for sample_type in SAMPLE_TYPES:
-        train_folder = os.path.join(TRAINIG_PATH, sample_type)
-        test_folder = os.path.join(TESTING_PATH, sample_type)
+        train_folder = os.path.join(constants.TRAINIG_PATH, sample_type)
+        test_folder = os.path.join(constants.TESTING_PATH, sample_type)
         get_folder_data(train_folder, images_train, masks_train, shape)
         get_folder_data(test_folder, images_test, masks_test, shape)
 
@@ -125,9 +122,8 @@ def get_folder_data(folder, images, masks, shape):
         if re.search("mask", sample):
             if file_resized.shape == (shape, shape, 3):
                 file_resized = np.zeros((shape, shape))
-
             masks.append(file_resized)
-        else:
+        elif not re.search("_", sample):
             images.append(file_resized)
 
 
@@ -279,7 +275,7 @@ def save_predictions(folder, sample_type, unet, shape):
     samples = os.listdir(destination)
 
     for sample in samples:
-        if re.search("mask", sample):
+        if re.search("_", sample):
             continue
 
         sample_number = re.search("\(\d+\)", sample).group()
@@ -296,7 +292,11 @@ def save_predictions(folder, sample_type, unet, shape):
 
 if __name__ == "__main__":
     # Train a model if it does not already exists
-    if not os.path.isfile(os.path.join(os.getcwd(), "SonogramSegmentationModel.h5")):
+    segmentation_model_path = os.path.join(
+        constants.MODELS_PATH, "SonogramSegmentationModel.h5"
+    )
+
+    if not os.path.isfile(segmentation_model_path):
         # Split the data into training and testing datasets
         split_sonogram_data()
 
@@ -317,24 +317,24 @@ if __name__ == "__main__":
         fit_result = unet_model.fit(
             X_train,
             y_train,
-            batch_size=10,
-            epochs=100,
+            batch_size=5,
+            epochs=200,
             verbose=2,
             validation_data=(X_test, y_test),
         )
 
-        unet_model.save("SonogramSegmentationModel.h5")
+        unet_model.save(segmentation_model_path)
 
     """
     Save the predictions in segmentation folders.
     The predictions will be used to train a classification model.
     """
     # Load the saved detection segmentation model
-    unet_model = tf.keras.models.load_model("SonogramSegmentationModel.h5")
+    unet_model = tf.keras.models.load_model(segmentation_model_path)
 
     for sample_type in SAMPLE_TYPES:
         # Save training data
-        save_predictions(TRAINIG_PATH, sample_type, unet_model, shape=256)
+        save_predictions(constants.TRAINIG_PATH, sample_type, unet_model, shape=256)
 
         # Save testing data
-        save_predictions(TESTING_PATH, sample_type, unet_model, shape=256)
+        save_predictions(constants.TESTING_PATH, sample_type, unet_model, shape=256)
