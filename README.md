@@ -32,7 +32,9 @@ The code is split into two main parts: an FNA folder containing the classifiers 
 
 ### Sonogram Segmentation
 
-**SonogramSegmentation.py** script begins by splitting the data from the _Dataset_BUSI_with_GT_ folder into an 80% and 20% training split that will respectively be placed in the _Dataset_BUSI_with_GT_Train_ and the _Dataset_BUSI_with_GT_Test_ folders. After the data is split, it will begin training a model dedicated to generating the segmentation of the ultrasound images. Once the model is trained, it is saved as **SonogramSegmentationModel.h5** in the _models_ sub-folder and then used to generate and save the sonograms for both training and testing folders. We tested with different hyperparameters and achieved an accuracy of 94%.
+**SonogramSegmentation.py** script begins by splitting the data from the _Dataset_BUSI_with_GT_ folder into an 80% and 20% training split that will respectively be placed in the _Dataset_BUSI_with_GT_Train_ and the _Dataset_BUSI_with_GT_Test_ folders. After the data is split, it will begin training a model dedicated to generating the segmentation of the ultrasound images. Once the model is trained, it is saved as **SonogramSegmentationModel.h5** in the _models_ sub-folder and then used to generate and save the sonograms for both training and testing folders. We tested with different hyperparameters and achieved an accuracy of 94%. The image below shows what the generated segmentations saved.
+
+![image](https://user-images.githubusercontent.com/60043552/206939452-97e94d48-2686-43fe-a769-9ea7cd30a50d.png)
 
 ### Classification Model
 
@@ -41,6 +43,8 @@ The code is split into two main parts: an FNA folder containing the classifiers 
 ### Diagnosis Classification
 
 **DiagnosisClassification.py** script takes the generated images from the _Dataset_BUSI_with_GT_Train_ folder and the in the _normal_, _benign_, and _malignant_ sub-folders to train a model to classify the segmentation images as either normal, benign or malignant. Finally, the model is tested with the images from the _Dataset_BUSI_with_GT_Test_ folder and only achieves an accuracy of 64%.
+
+![image](https://user-images.githubusercontent.com/60043552/206939491-3f4a6f51-bfc8-4943-9f1b-5e84f509107d.png)
 
 ### Normality Classification
 
