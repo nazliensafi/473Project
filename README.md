@@ -1,4 +1,4 @@
-# 473Project
+# Pattern Recognition Project
 
 In the root directory, you can run:
 
